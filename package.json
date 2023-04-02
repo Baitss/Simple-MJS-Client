@@ -1,0 +1,49 @@
+{
+  "name": "mahjong-soul-client",
+  "author": "RFLXN",
+  "version": "1.0.0",
+  "main": "dist/main.js",
+  "description": "A Simple Mahjong Soul Client",
+  "scripts": {
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "clear-dist": "rimraf -g -I ./dist/**/*",
+    "compile": "tsc",
+    "precompile": "yarpm run lint:fix && yarpm run clear-dist",
+    "start": "electron .",
+    "prestart": "yarpm run compile",
+    "build": "electron-builder",
+    "prebuild": "yarpm run compile"
+  },
+  "license": "MIT",
+  "build": {
+    "productName": "Mahjong Soul Client",
+    "appId": "xyz.rflxn.mjs-client",
+    "files": [
+      "dist/**/*"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "directories": {
+      "output": "release/${platform}/${arch}"
+    }
+  },
+  "dependencies": {
+    "electron-is-dev": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/electron": "^1.6.10",
+    "@typescript-eslint/eslint-plugin": "^5.57.0",
+    "@typescript-eslint/parser": "^5.57.0",
+    "electron": "^23.2.1",
+    "electron-builder": "^23.6.0",
+    "eslint": "^8.37.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-config-airbnb-typescript": "^17.0.0",
+    "eslint-plugin-import": "^2.27.5",
+    "rimraf": "^4.4.1",
+    "typescript": "^5.0.3",
+    "yarpm": "^1.2.0"
+  }
+}
