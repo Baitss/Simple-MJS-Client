@@ -1,7 +1,7 @@
 {
   "name": "mahjong-soul-client",
   "author": "RFLXN",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "main": "dist/main.js",
   "description": "A Simple Mahjong Soul Client",
   "scripts": {
@@ -13,7 +13,7 @@
     "start": "electron .",
     "prestart": "yarpm run compile",
     "build": "electron-builder",
-    "prebuild": "yarpm run compile"
+    "prebuild": "yarpm run compile && rimraf -g -I ./release/**/*"
   },
   "license": "MIT",
   "build": {

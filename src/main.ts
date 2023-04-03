@@ -4,10 +4,12 @@ import { writeFile } from "fs/promises";
 import { join } from "path";
 import applyShortcuts from "./shortcut";
 import fetchIcon from "./fetch-icon";
+import { applyNetworkHookListener, registerNetworkHooker } from "./network";
+import { applyMahjongSoulNetworkEventHandlers } from "./mjs-network-event";
 
 const MJ_URL = "https://mahjongsoul.game.yo-star.com/kr/index.html";
 const FAVICON_URL = "https://webusstatic.yo-star.com/mahjongsoul_kr_web/mainsite/prod/favicon.ico";
-const LOCAL_FAVICON_PATH = "favicon.ico";
+const LOCAL_FAVICON_PATH = join(app.getPath("appData"), "favicon.ico");
 const WINDOW_TITLE = "Mahjong Soul";
 
 let mainWindow: BrowserWindow;
@@ -32,7 +34,7 @@ const createWindow = async () => {
         fullscreenable: true,
         webPreferences: {
             preload: join(__dirname, "preload.js"),
-            devTools: true
+            devTools: isDev
         },
         icon
     });
@@ -45,22 +47,26 @@ const createWindow = async () => {
     window.setAspectRatio(16 / 9);
     window.removeMenu();
 
-    /*
     let resizeTimeout: NodeJS.Timeout;
     window.on("resize", () => {
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
             const size = window.getSize();
-            window.setSize(size[0], Math.round(size[0] * (9 / 16)));
-        }, 100);
+            const titleBarSize = size[1] - window.getContentSize()[1];
+            window.setSize(size[0], Math.floor(size[0] * (9 / 16) + titleBarSize));
+        }, 10);
     });
-    */
 
-    await window.loadURL(MJ_URL);
+    registerNetworkHooker(window)
+        .then(applyNetworkHookListener)
+        .then(applyMahjongSoulNetworkEventHandlers)
+        .catch(console.error);
 
     if (isDev) {
         window.webContents.openDevTools();
     }
+
+    await window.loadURL(MJ_URL);
 
     return window;
 };
@@ -68,7 +74,7 @@ const createWindow = async () => {
 app.whenReady().then(async () => {
     mainWindow = await createWindow();
     applyShortcuts();
-});
+}).catch(console.error);
 
 app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length == 0) mainWindow = await createWindow();
