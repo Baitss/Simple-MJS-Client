@@ -1,130 +1,26 @@
 import { BrowserWindow, Debugger } from "electron";
 import { EventEmitter } from "events";
 import { MahjongSoulNetworkEventEmitter } from "./mjs-network-event";
-import { LoginRequestData, LoginResponseData } from "./mjs-type";
-
-enum ChromeDevtoolEvents {
-    dataReceived = "dataReceived",
-    eventSourceMessageReceived = "eventSourceMessageReceived",
-    loadingFailed = "loadingFailed",
-    loadingFinished = "loadingFinished",
-    requestServedFromCache = "requestServedFromCache",
-    requestWillBeSent = "requestWillBeSent",
-    responseReceived = "responseReceived",
-    webSocketClosed = "webSocketClosed",
-    webSocketCreated = "webSocketCreated",
-    webSocketFrameError = "webSocketFrameError",
-    webSocketFrameReceived = "webSocketFrameReceived",
-    webSocketFrameSent = "webSocketFrameSent",
-    webSocketHandshakeResponseReceived = "webSocketHandshakeResponseReceived",
-    webSocketWillSendHandshakeRequest = "webSocketWillSendHandshakeRequest",
-    webTransportClosed = "webTransportClosed",
-    webTransportConnectionEstablished = "webTransportConnectionEstablished",
-    webTransportCreated = "webTransportCreated"
-}
-
-enum ChromeDevtoolCommands {
-    clearBrowserCache = "clearBrowserCache",
-    clearBrowserCookies = "clearBrowserCookies",
-    deleteCookies = "deleteCookies",
-    disable = "disable",
-    emulateNetworkConditions = "emulateNetworkConditions",
-    enable = "enable",
-    getCookies = "getCookies",
-    getRequestPostData = "getRequestPostData",
-    getResponseBody = "getResponseBody",
-    setCacheDisabled = "setCacheDisabled",
-    setCookie = "setCookie",
-    setCookies = "setCookies",
-    setExtraHTTPHeaders = "setExtraHTTPHeaders",
-    setUserAgentOverride = "setUserAgentOverride"
-}
-
-type ResourceType = "Document" | "Stylesheet" | "Image" | "Media" | "Font" | "Script" | "TextTrack" | "XHR"
-| "Fetch" | "Prefetch" | "EventSource" | "WebSocket" | "Manifest" | "SignedExchange" | "Ping" | "CSPViolationReport"
-| "Preflight" | "Other";
-
-type ChromeDevtoolEventKeys = keyof typeof ChromeDevtoolEvents;
-type ChromeDevtoolCommandKeys = keyof typeof ChromeDevtoolCommands;
-
-interface ResponseReceivedParams {
-    frameId: string,
-    hasExtraInfo: boolean,
-    loaderId: string,
-    requestId: string,
-    timestamp: number,
-    type: ResourceType,
-    response: {
-        url: string,
-        status: number,
-        statusText: string,
-        headers: Record<string, string>,
-        mimeType: string,
-        requestHeaders?: Record<string, string>,
-        connectionRefused: boolean,
-        connectionId: number,
-        remoteIPAddress?: string,
-        remotePort?: number,
-        fromDiskCache?: boolean,
-        fromServiceWorker?: boolean,
-        fromPrefetchCache?: boolean,
-        encodedDataLength: number,
-        timing?: string,
-        responseTime?: number,
-        cacheStorageCacheName?: string,
-        protocol?: string,
-        serviceWorkerResponseSource?: "cache-storage" | "http-cache" | "fallback-code" | "network"
-    }
-}
-
-interface RequestSentParams {
-    requestId: string,
-    loaderId: string,
-    documentURL: string,
-    request: {
-        url: string,
-        urlFragment?: string,
-        method: string,
-        headers: Record<string, string>,
-        postData?: string,
-        hasPostData?: boolean,
-        referrerPolicy: string,
-        isLinkPreload?: boolean
-    },
-    timestamp: number,
-    wallTime: number,
-    initiator: {
-        type: "parser" | "script" | "preload" | "SignedExchange" | "preflight" | "other",
-        url?: string,
-        lineNumber?: number,
-        columnNumber?: number,
-        requestId: string
-    },
-    redirectHasExtraInfo: boolean,
-    redirectResponse?: {
-        url: string,
-        urlFragment?: string,
-        method: string,
-        headers: Record<string, string>,
-        postData?: string,
-        hasPostData?: boolean,
-        referrerPolicy: string,
-        isLinkPreload?: boolean
-    },
-    type?: ResourceType,
-    frameId?: string,
-    hasUserGesture?: boolean
-}
-
-interface WebSocketParams {
-    requestId: string,
-    timestamp: number,
-    response: {
-        opcode: number,
-        mask: boolean,
-        payloadData: string
-    }
-}
+import { decodeMessage, lookupObject, parsePath } from "./protobuff";
+import {
+    base64toHex, base64toString, hexToBase64, stringToBase64
+} from "./util/str-encode";
+import {
+    ChromeDevtoolCommandKeys,
+    ChromeDevtoolCommands,
+    ChromeDevtoolEventKeys,
+    ChromeDevtoolEvents,
+    LoginRequestData,
+    LoginResponseData,
+    RequestSentParams,
+    ResponseReceivedParams,
+    WebSocketParams,
+    WebsocketResponse,
+    WsBodyParseResult,
+    WsRequestBodyParseResult,
+    WsResponseBodyParseResult,
+    WsType
+} from "./type/network";
 
 const resolveDevtoolMethod = (key: ChromeDevtoolCommandKeys | ChromeDevtoolEventKeys) => {
     const cmdKeys = Object.keys(ChromeDevtoolCommands) as ChromeDevtoolCommandKeys[];
@@ -154,7 +50,7 @@ class NetworkHooker extends EventEmitter {
     public typedOn(method: "responseReceived", listener: (event: Event, params: ResponseReceivedParams) => void): any;
     public typedOn(method: "requestWillBeSent", listener: (event: Event, params: RequestSentParams) => void): any;
     public typedOn(method: "webSocketFrameReceived", listener: (event: Event, params: WebSocketParams) => void): any;
-    public typedOn(method: "webSocketFrameSent", listener: (event: Event, args: WebSocketParams) => void): any;
+    public typedOn(method: "webSocketFrameSent", listener: (event: Event, params: WebSocketParams) => void): any;
     public typedOn(method: ChromeDevtoolEventKeys, listener: (event: Event, params: any) => void) {
         super.on(method, listener);
     }
@@ -194,21 +90,95 @@ const registerNetworkHooker = async (window: BrowserWindow) => {
     });
 };
 
+const parseRawWsBody = (base64body: string): WsBodyParseResult => {
+    const hexBody = base64toHex(base64body);
+
+    let type: WsType;
+    if (hexBody.startsWith("03")) {
+        type = "RESPONSE";
+    } else if (hexBody.startsWith("02")) {
+        type = "REQUEST";
+    } else {
+        throw new Error("Invalid Websocket Body Data");
+    }
+
+    let parseBuffer = hexBody.slice(2);
+    const requestId = parseBuffer.slice(0, 6);
+    parseBuffer = parseBuffer.slice(6);
+
+    if (type == "REQUEST") {
+        const path = parsePath(base64toString(base64body));
+
+        if (!path) {
+            throw new Error("Invalid Websocket Request Body Data");
+        }
+
+        const fullPath = `.lq.${path}`;
+        const hexPath = base64toHex(stringToBase64(fullPath));
+
+        parseBuffer = parseBuffer.slice(hexPath.length + 2);
+
+        return {
+            type, requestId, hexData: parseBuffer, path
+        } as WsRequestBodyParseResult;
+    }
+
+    return {
+        type, requestId, hexData: parseBuffer.slice(2)
+    } as WsResponseBodyParseResult;
+};
 const doWsResProcess = async (data: WebSocketParams) => {
-    /*
     const body = data.response.payloadData;
 
-    const path = parsePath(base64toString(body));
+    try {
+        const result = parseRawWsBody(body);
 
-    if (path) {
-        const obj = lookupObject(path).toJSON();
-        const req = obj.requestType;
-        const res = obj.responseType;
+        const emitter = MahjongSoulNetworkEventEmitter.instance;
 
-        const resMsg = decodeMessage(req, body);
-        const reqMsg = decodeMessage(res, body);
-        console.log(reqMsg, resMsg);
-    } */
+        const responseData: WebsocketResponse = {
+            requestId: result.requestId,
+            rawResponseBody: result.hexData,
+            rawData: body
+        };
+
+        emitter.typedEmit("wsResponded", responseData);
+    } catch (e) {
+        console.error(e);
+        console.error(`Base64 Body: ${body}`);
+    }
+};
+
+const doWsReqProcess = async (data: WebSocketParams) => {
+    const body = data.response.payloadData;
+
+    try {
+        const result = parseRawWsBody(body) as WsRequestBodyParseResult;
+
+        const rpc = lookupObject(result.path);
+        const { requestType, responseType } = rpc.toJSON() as {
+            requestType: string, responseType: string
+        };
+
+        const parsed = decodeMessage(requestType, hexToBase64(result.hexData));
+
+        const parsedObj = parsed?.toJSON();
+
+        if (parsedObj) {
+            MahjongSoulNetworkEventEmitter.instance.typedEmit("wsRequested", {
+                requestId: result.requestId,
+                requestType,
+                responseType,
+                requestData: parsedObj,
+                rawData: body,
+                rawRequestBody: result.hexData
+            });
+        } else {
+            throw new Error("There is no Type in Protocol Buffer File.");
+        }
+    } catch (e) {
+        console.error(e);
+        console.error(`Base64 Body: ${body}`);
+    }
 };
 
 const applyNetworkHookListener = () => {
@@ -257,7 +227,7 @@ const applyNetworkHookListener = () => {
     });
 
     hooker.typedOn("webSocketFrameSent", async (event, args) => {
-        await doWsResProcess(args);
+        await doWsReqProcess(args);
     });
 };
 

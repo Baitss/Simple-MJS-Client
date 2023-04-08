@@ -1,7 +1,7 @@
 {
   "name": "mahjong-soul-client",
   "author": "RFLXN",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "main": "dist/main.js",
   "description": "A Simple Mahjong Soul Client",
   "scripts": {
@@ -23,7 +23,8 @@
       "dist/**/*"
     ],
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "icon": "icon.ico"
     },
     "directories": {
       "output": "release/${platform}/${arch}"

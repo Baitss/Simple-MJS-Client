@@ -66,8 +66,12 @@ const createWindow = async () => {
 
     await window.loadURL(MJ_URL);
 
-    const discord = await initDiscord();
-    await setActivity(discord);
+    initDiscord()
+        .then((client) => setActivity(client))
+        .catch((e) => {
+            console.error("Failed to Connect Discord RPC Server.");
+            console.error(e);
+        });
 
     return window;
 };
