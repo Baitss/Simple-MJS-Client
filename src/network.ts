@@ -12,10 +12,10 @@ import {
     ChromeDevtoolEvents,
     LoginRequestData,
     LoginResponseData,
+    ParsedWebsocketResponse,
     RequestSentParams,
     ResponseReceivedParams,
     WebSocketParams,
-    WebsocketResponse,
     WsBodyParseResult,
     WsRequestBodyParseResult,
     WsResponseBodyParseResult,
@@ -132,16 +132,26 @@ const doWsResProcess = async (data: WebSocketParams) => {
 
     try {
         const result = parseRawWsBody(body);
-
         const emitter = MahjongSoulNetworkEventEmitter.instance;
+        const request = emitter.getWsQueue(result.requestId);
 
-        const responseData: WebsocketResponse = {
-            requestId: result.requestId,
+        const parsed = decodeMessage(request.responseType, hexToBase64(result.hexData));
+        const parsedObj = parsed?.toJSON();
+
+        if (!parsedObj) {
+            throw new Error("There is no Type in Protocol Buffer File.");
+        }
+
+        const response: ParsedWebsocketResponse<object> = {
+            requestId: request.requestId,
+            request,
+            responseData: parsedObj,
             rawResponseBody: result.hexData,
             rawData: body
         };
 
-        emitter.typedEmit("wsResponded", responseData);
+        emitter.removeWsQueue(request.requestId);
+        emitter.typedEmit("wsResponded", response);
     } catch (e) {
         console.error(e);
         console.error(`Base64 Body: ${body}`);

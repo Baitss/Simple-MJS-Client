@@ -1,15 +1,13 @@
 import { EventEmitter } from "events";
 import {
-    LoginRequestData, LoginResponseData, ParsedWebsocketRequest, WebsocketResponse
+    LoginRequestData, LoginResponseData, ParsedWebsocketRequest, ParsedWebsocketResponse
 } from "./type/network";
-import { decodeMessage } from "./protobuff";
-import { hexToBase64 } from "./util/str-encode";
 
 interface MahjongSoulNetworkEvent {
     loginRequested: [requestData: LoginRequestData];
     loginResponded: [responseData: LoginResponseData];
     wsRequested: [requestData: ParsedWebsocketRequest<object>];
-    wsResponded: [responseData: WebsocketResponse];
+    wsResponded: [responseData: ParsedWebsocketResponse<object>];
 }
 
 type MahjongSoulNetworkEventName = keyof MahjongSoulNetworkEvent;
@@ -86,17 +84,8 @@ const applyMahjongSoulNetworkEventHandlers = () => {
         emitter.addWsQueue(requestData);
     });
 
-    emitter.typedOn("wsResponded", (responseData: WebsocketResponse) => {
-        const request = emitter.getWsQueue(responseData.requestId);
-
-        try {
-            const parsed = decodeMessage(request.responseType, hexToBase64(responseData.rawResponseBody));
-            console.log(parsed);
-        } catch (e) {
-            console.error(e);
-            console.error(`Base64 Body: ${responseData.rawData}`);
-        }
-        emitter.removeWsQueue(request.requestId);
+    emitter.typedOn("wsResponded", (responseData: ParsedWebsocketResponse<object>) => {
+        console.log(responseData);
     });
 };
 

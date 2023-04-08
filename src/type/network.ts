@@ -165,7 +165,7 @@ interface LoginResponseData {
 interface ParsedWebsocketRequest<T extends object> {
     requestId: string;
     requestType: string;
-    responseType: string
+    responseType: string;
     requestData: T;
     /**
      * Websocket Request Body (hex)
@@ -177,8 +177,10 @@ interface ParsedWebsocketRequest<T extends object> {
     rawData: string;
 }
 
-interface WebsocketResponse {
+interface ParsedWebsocketResponse<T extends object> {
     requestId: string;
+    request: ParsedWebsocketRequest<object>;
+    responseData: T;
     /**
      * Websocket Response Body (hex)
      */
@@ -205,5 +207,5 @@ export {
     LoginResponseData,
     LoginRequestData,
     ParsedWebsocketRequest,
-    WebsocketResponse
+    ParsedWebsocketResponse
 };
