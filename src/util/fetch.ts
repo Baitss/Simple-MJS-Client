@@ -11,7 +11,7 @@ const callback = (res: IncomingMessage, resolver: (buffer: Buffer) => any) => {
     });
 };
 
-const fetchIcon = async (url: string) => new Promise<Buffer>((resolve) => {
+const fetch = async (url: string) => new Promise<Buffer>((resolve) => {
     if (url.startsWith("https")) {
         getHttps(url, (res) => {
             callback(res, resolve);
@@ -23,4 +23,4 @@ const fetchIcon = async (url: string) => new Promise<Buffer>((resolve) => {
     }
 });
 
-export default fetchIcon;
+export default fetch;

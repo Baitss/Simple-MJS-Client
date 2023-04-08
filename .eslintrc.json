@@ -62,7 +62,8 @@
     "class-methods-use-this": "off",
     "implicit-arrow-linebreak": "off",
     "import/no-cycle": "off",
-    "import/no-extraneous-dependencies": "off"
+    "import/no-extraneous-dependencies": "off",
+    "prefer-destructuring": "off"
   },
   "env": {
     "node": true

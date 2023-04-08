@@ -1,27 +1,25 @@
-import { app, BrowserWindow, nativeImage } from "electron";
+import { app, BrowserWindow } from "electron";
 import isDev from "electron-is-dev";
-import { writeFile } from "fs/promises";
 import { join } from "path";
 import applyShortcuts from "./shortcut";
-import fetchIcon from "./fetch-icon";
 import { applyNetworkHookListener, registerNetworkHooker } from "./network";
 import { applyMahjongSoulNetworkEventHandlers } from "./mjs-network-event";
+import { downloadProtoFile, loadProto } from "./protobuff";
+import { createIconObj, downloadIcon } from "./icon";
+import { initDiscord, setActivity } from "./discord";
 
 const MJ_URL = "https://mahjongsoul.game.yo-star.com/kr/index.html";
-const FAVICON_URL = "https://webusstatic.yo-star.com/mahjongsoul_kr_web/mainsite/prod/favicon.ico";
-const LOCAL_FAVICON_PATH = join(app.getPath("appData"), "favicon.ico");
+
 const WINDOW_TITLE = "Mahjong Soul";
 
 let mainWindow: BrowserWindow;
 
-const downloadIcon = async () => {
-    const raw = await fetchIcon(FAVICON_URL);
-    await writeFile(LOCAL_FAVICON_PATH, raw);
-};
 const createWindow = async () => {
     await downloadIcon();
+    await downloadProtoFile();
+    await loadProto();
 
-    const icon = nativeImage.createFromPath(LOCAL_FAVICON_PATH);
+    const icon = createIconObj();
 
     const window = new BrowserWindow({
         title: WINDOW_TITLE,
@@ -67,6 +65,9 @@ const createWindow = async () => {
     }
 
     await window.loadURL(MJ_URL);
+
+    const discord = await initDiscord();
+    await setActivity(discord);
 
     return window;
 };

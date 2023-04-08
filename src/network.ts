@@ -47,6 +47,85 @@ type ResourceType = "Document" | "Stylesheet" | "Image" | "Media" | "Font" | "Sc
 type ChromeDevtoolEventKeys = keyof typeof ChromeDevtoolEvents;
 type ChromeDevtoolCommandKeys = keyof typeof ChromeDevtoolCommands;
 
+interface ResponseReceivedParams {
+    frameId: string,
+    hasExtraInfo: boolean,
+    loaderId: string,
+    requestId: string,
+    timestamp: number,
+    type: ResourceType,
+    response: {
+        url: string,
+        status: number,
+        statusText: string,
+        headers: Record<string, string>,
+        mimeType: string,
+        requestHeaders?: Record<string, string>,
+        connectionRefused: boolean,
+        connectionId: number,
+        remoteIPAddress?: string,
+        remotePort?: number,
+        fromDiskCache?: boolean,
+        fromServiceWorker?: boolean,
+        fromPrefetchCache?: boolean,
+        encodedDataLength: number,
+        timing?: string,
+        responseTime?: number,
+        cacheStorageCacheName?: string,
+        protocol?: string,
+        serviceWorkerResponseSource?: "cache-storage" | "http-cache" | "fallback-code" | "network"
+    }
+}
+
+interface RequestSentParams {
+    requestId: string,
+    loaderId: string,
+    documentURL: string,
+    request: {
+        url: string,
+        urlFragment?: string,
+        method: string,
+        headers: Record<string, string>,
+        postData?: string,
+        hasPostData?: boolean,
+        referrerPolicy: string,
+        isLinkPreload?: boolean
+    },
+    timestamp: number,
+    wallTime: number,
+    initiator: {
+        type: "parser" | "script" | "preload" | "SignedExchange" | "preflight" | "other",
+        url?: string,
+        lineNumber?: number,
+        columnNumber?: number,
+        requestId: string
+    },
+    redirectHasExtraInfo: boolean,
+    redirectResponse?: {
+        url: string,
+        urlFragment?: string,
+        method: string,
+        headers: Record<string, string>,
+        postData?: string,
+        hasPostData?: boolean,
+        referrerPolicy: string,
+        isLinkPreload?: boolean
+    },
+    type?: ResourceType,
+    frameId?: string,
+    hasUserGesture?: boolean
+}
+
+interface WebSocketParams {
+    requestId: string,
+    timestamp: number,
+    response: {
+        opcode: number,
+        mask: boolean,
+        payloadData: string
+    }
+}
+
 const resolveDevtoolMethod = (key: ChromeDevtoolCommandKeys | ChromeDevtoolEventKeys) => {
     const cmdKeys = Object.keys(ChromeDevtoolCommands) as ChromeDevtoolCommandKeys[];
     if (cmdKeys.find((k) => k == key)) {
@@ -72,73 +151,10 @@ class NetworkHooker extends EventEmitter {
         this.devtoolIns = devToolIns;
     }
 
-    public typedOn(method: "responseReceived", listener: (event: Event, params: {
-        frameId: string,
-        hasExtraInfo: boolean,
-        loaderId: string,
-        requestId: string,
-        timestamp: number,
-        type: ResourceType,
-        response: {
-            url: string,
-            status: number,
-            statusText: string,
-            headers: Record<string, string>,
-            mimeType: string,
-            requestHeaders?: Record<string, string>,
-            connectionRefused: boolean,
-            connectionId: number,
-            remoteIPAddress?: string,
-            remotePort?: number,
-            fromDiskCache?: boolean,
-            fromServiceWorker?: boolean,
-            fromPrefetchCache?: boolean,
-            encodedDataLength: number,
-            timing?: string,
-            responseTime?: number,
-            cacheStorageCacheName?: string,
-            protocol?: string,
-            serviceWorkerResponseSource?: "cache-storage" | "http-cache" | "fallback-code" | "network"
-        }
-    }) => void): any;
-    public typedOn(method: "requestWillBeSent", listener: (event: Event, params: {
-        requestId: string,
-        loaderId: string,
-        documentURL: string,
-        request: {
-            url: string,
-            urlFragment?: string,
-            method: string,
-            headers: Record<string, string>,
-            postData?: string,
-            hasPostData?: boolean,
-            referrerPolicy: string,
-            isLinkPreload?: boolean
-        },
-        timestamp: number,
-        wallTime: number,
-        initiator: {
-            type: "parser" | "script" | "preload" | "SignedExchange" | "preflight" | "other",
-            url?: string,
-            lineNumber?: number,
-            columnNumber?: number,
-            requestId: string
-        },
-        redirectHasExtraInfo: boolean,
-        redirectResponse?: {
-            url: string,
-            urlFragment?: string,
-            method: string,
-            headers: Record<string, string>,
-            postData?: string,
-            hasPostData?: boolean,
-            referrerPolicy: string,
-            isLinkPreload?: boolean
-        },
-        type?: ResourceType,
-        frameId?: string,
-        hasUserGesture?: boolean
-    }) => void): any;
+    public typedOn(method: "responseReceived", listener: (event: Event, params: ResponseReceivedParams) => void): any;
+    public typedOn(method: "requestWillBeSent", listener: (event: Event, params: RequestSentParams) => void): any;
+    public typedOn(method: "webSocketFrameReceived", listener: (event: Event, params: WebSocketParams) => void): any;
+    public typedOn(method: "webSocketFrameSent", listener: (event: Event, args: WebSocketParams) => void): any;
     public typedOn(method: ChromeDevtoolEventKeys, listener: (event: Event, params: any) => void) {
         super.on(method, listener);
     }
@@ -176,6 +192,23 @@ const registerNetworkHooker = async (window: BrowserWindow) => {
             }
         });
     });
+};
+
+const doWsResProcess = async (data: WebSocketParams) => {
+    /*
+    const body = data.response.payloadData;
+
+    const path = parsePath(base64toString(body));
+
+    if (path) {
+        const obj = lookupObject(path).toJSON();
+        const req = obj.requestType;
+        const res = obj.responseType;
+
+        const resMsg = decodeMessage(req, body);
+        const reqMsg = decodeMessage(res, body);
+        console.log(reqMsg, resMsg);
+    } */
 };
 
 const applyNetworkHookListener = () => {
@@ -217,6 +250,14 @@ const applyNetworkHookListener = () => {
             const responseData = JSON.parse(body) as LoginResponseData;
             networkEventEmitter.typedEmit("loginResponded", responseData);
         }
+    });
+
+    hooker.typedOn("webSocketFrameReceived", async (event, args) => {
+        await doWsResProcess(args);
+    });
+
+    hooker.typedOn("webSocketFrameSent", async (event, args) => {
+        await doWsResProcess(args);
     });
 };
 
