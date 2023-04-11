@@ -1,6 +1,6 @@
 import { load, Root } from "protobufjs";
 import { join } from "path";
-import { writeFile } from "fs/promises";
+import { access, writeFile } from "fs/promises";
 import fetch from "./util/fetch";
 import { APP_DATA_PATH } from "./util/path";
 import { base64toUint8Array, hexToUint8Array } from "./util/str-encode";
@@ -10,7 +10,20 @@ const LOCAL_FILE_PATH = join(APP_DATA_PATH, "mjs.proto");
 
 let proto: Root;
 
+const hasProtoFile = async (): Promise<boolean> => {
+    try {
+        await access(LOCAL_FILE_PATH);
+        return true;
+    } catch (e) {
+        return false;
+    }
+};
 const downloadProtoFile = async () => {
+    if (await hasProtoFile()) {
+        console.log("WS Protocol Buffer File Found. Skip Download.");
+        return;
+    }
+
     console.log("Download WS Protocol Buffer File...");
     console.log(`from '${PROTO_FILE_URL}' -> to '${LOCAL_FILE_PATH}'`);
 
