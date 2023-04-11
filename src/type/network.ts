@@ -121,22 +121,33 @@ interface WebSocketParams {
     }
 }
 
-type WsType = "REQUEST" | "RESPONSE";
+type WsType = "REQUEST" | "RESPONSE" | "INBOUND_ONLY";
 
 interface WsBodyParseResult {
     type: WsType,
-    requestId: string,
+    requestId?: string,
     hexData: string,
-    path?: string
+    path?: string,
+    hexPath?: string,
+    hexBodyCandidate: string[]
+}
+
+interface WsInboundBodyParseResult extends WsBodyParseResult {
+    type: "INBOUND_ONLY",
+    path: string,
+    hexPath: string
 }
 
 interface WsRequestBodyParseResult extends WsBodyParseResult {
     type: "REQUEST",
-    path: string
+    path: string,
+    hexPath: string,
+    requestId: string
 }
 
 interface WsResponseBodyParseResult extends WsBodyParseResult {
-    type: "RESPONSE"
+    type: "RESPONSE",
+    requestId: string
 }
 
 interface LoginRequestData {
@@ -165,6 +176,7 @@ interface LoginResponseData {
 interface ParsedWebsocketRequest<T extends object> {
     requestId: string;
     requestType: string;
+    requestMethod: string;
     responseType: string;
     requestData: T;
     /**
@@ -172,9 +184,10 @@ interface ParsedWebsocketRequest<T extends object> {
      */
     rawRequestBody: string;
     /**
-     * Raw Websocket Request Data (Base64)
+     * Raw Websocket Request Data (hex)
      */
     rawData: string;
+    hexRequestMethod: string;
 }
 
 interface ParsedWebsocketResponse<T extends object> {
@@ -186,7 +199,21 @@ interface ParsedWebsocketResponse<T extends object> {
      */
     rawResponseBody: string;
     /**
-     * Raw Websocket Response Data (Base64)
+     * Raw Websocket Response Data (hex)
+     */
+    rawData: string;
+}
+
+interface ParsedWebsocketInbound<T extends object> {
+    path: string;
+    hexPath: string;
+    responseData: T;
+    /**
+     * Websocket Response Body (hex)
+     */
+    rawResponseBody: string;
+    /**
+     * Raw Websocket Response Data (hex)
      */
     rawData: string;
 }
@@ -207,5 +234,7 @@ export {
     LoginResponseData,
     LoginRequestData,
     ParsedWebsocketRequest,
-    ParsedWebsocketResponse
+    ParsedWebsocketResponse,
+    ParsedWebsocketInbound,
+    WsInboundBodyParseResult
 };

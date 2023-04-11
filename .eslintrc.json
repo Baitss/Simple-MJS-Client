@@ -63,7 +63,8 @@
     "implicit-arrow-linebreak": "off",
     "import/no-cycle": "off",
     "import/no-extraneous-dependencies": "off",
-    "prefer-destructuring": "off"
+    "prefer-destructuring": "off",
+    "no-plusplus": "off"
   },
   "env": {
     "node": true

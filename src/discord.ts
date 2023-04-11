@@ -1,4 +1,5 @@
 import { Client, Presence } from "discord-rpc";
+import { getApplicationOpenDate } from "./main";
 
 const APPLICATION_ID = "1094154059625283584";
 
@@ -6,7 +7,7 @@ const createDefaultActivity = () => {
     const activity: Presence = {
         largeImageKey: "logo",
         state: "Mahjong Soul",
-        startTimestamp: new Date()
+        startTimestamp: getApplicationOpenDate()
     };
 
     return activity;
