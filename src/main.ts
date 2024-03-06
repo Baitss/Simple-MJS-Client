@@ -11,7 +11,7 @@ import { initDiscord, setActivity } from "./discord";
 import { applyMahjongSoulMatchEventHandlers } from "./mjs-match-event";
 
 const MJ_URL = "https://mahjongsoul.game.yo-star.com/index.html";
-const WINDOW_TITLE = "MahjongSoul;
+const WINDOW_TITLE = "MahjongSoul";
 
 // console.log = log;
 // console.error = error;
